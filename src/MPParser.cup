@@ -1,0 +1,203 @@
+// Import sekcija
+import java_cup.runtime.*;
+import java.io.*;
+
+parser code {:
+   public int errNo = 0;
+
+   public static void main(String[] args) {
+      try {
+         FileReader file = new FileReader(args[0]);
+         Scanner scanner = new MPLexer(file);
+         MPParser parser = new MPParser(scanner);
+         parser.parse();
+         if (parser.errNo == 0)
+            System.out.println("Analiza je zavrsena. U kodu nema gresaka.");
+         else
+            System.out.println("Analiza je zavrsena. Broj gresaka: " + parser.errNo);
+      } catch (Exception e) {
+         e.printStackTrace();
+      }
+   }
+
+   public void syntax_error(Symbol cur_token) { }
+
+   public void report_error(String message, Object info) {
+      System.out.print(message);
+   }
+
+   public int getLine() {
+      return ((MPLexer) getScanner()).getLine();
+   }
+:};
+
+// Terminali
+terminal MAIN, LOOP, REDO, INT, CHAR, FLOAT, BOOL, ID, CONST, OR, AND, LT, LE, EQ, NE, GT, GE, ASSIGN, LEFTPAR, RIGHTPAR, SEMICOLON, COMMA, LBRACE, RBRACE;
+
+// Non-terminali
+non terminal Program, Block, Declarations, VarDecl, NameList, Type, StatementList, Statement, RedoLoop, Expression, AndExpression, RelExpression, RelOp, Term;
+
+
+// Pravila
+
+Program ::= MAIN LEFTPAR RIGHTPAR Block
+          | MAIN LEFTPAR RIGHTPAR error
+          {: 
+             System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje BLOCK.");
+             parser.errNo++;
+          :}
+          | MAIN LEFTPAR error
+          {: 
+             System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje ')'.");
+             parser.errNo++;
+          :}
+          | MAIN error
+          {: 
+             System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje '(' ili telo funkcije.");
+             parser.errNo++;
+          :}
+          | error
+          {: 
+             System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje main");
+             parser.errNo++;
+          :};
+
+Block ::= LBRACE Declarations StatementList RBRACE
+        | LBRACE Declarations StatementList error
+          {:
+             System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje '}'.");
+             parser.errNo++;
+          :};
+
+Declarations ::= Declarations VarDecl
+               | /* epsilon */;
+
+VarDecl ::= Type NameList SEMICOLON
+         | Type NameList error
+            {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje ';'.");
+              parser.errNo++;
+           :};
+
+NameList ::= ID
+         | NameList COMMA ID
+         | NameList error
+         {:
+            System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje ','.");
+            parser.errNo++;
+         :};
+
+Type ::= INT
+       | CHAR
+       | FLOAT
+       | BOOL;
+
+
+StatementList ::= Statement StatementList
+                | Statement;
+
+Statement ::= ID ASSIGN Expression SEMICOLON
+            | Block
+            | RedoLoop
+            | ID ASSIGN Expression error
+            {:
+               System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje ';'.");
+               parser.errNo++;
+            :};
+
+RedoLoop ::= LOOP LEFTPAR Expression RIGHTPAR LBRACE Statement REDO LEFTPAR Expression RIGHTPAR SEMICOLON Statement RBRACE
+           | LOOP LEFTPAR Expression RIGHTPAR LBRACE Statement REDO LEFTPAR Expression RIGHTPAR SEMICOLON Statement error
+           {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje '}'.");
+              parser.errNo++;
+           :}
+           | LOOP LEFTPAR Expression RIGHTPAR LBRACE Statement REDO LEFTPAR Expression RIGHTPAR SEMICOLON error
+           {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje Statement. 2");
+              parser.errNo++;
+           :}
+           | LOOP LEFTPAR Expression RIGHTPAR LBRACE Statement REDO LEFTPAR Expression RIGHTPAR error
+           {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje ';'.");
+              parser.errNo++;
+           :}
+           | LOOP LEFTPAR Expression RIGHTPAR LBRACE Statement REDO LEFTPAR Expression error
+           {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje ')'.");
+              parser.errNo++;
+           :}
+           | LOOP LEFTPAR Expression RIGHTPAR LBRACE Statement REDO LEFTPAR error
+           {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje Expression.");
+              parser.errNo++;
+           :}
+           | LOOP LEFTPAR Expression RIGHTPAR LBRACE Statement REDO error
+           {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje '('.");
+              parser.errNo++;
+           :}
+           | LOOP LEFTPAR Expression RIGHTPAR LBRACE Statement error
+           {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje REDO.");
+              parser.errNo++;
+           :}
+           | LOOP LEFTPAR Expression RIGHTPAR LBRACE error
+           {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje Statement. 1");
+              parser.errNo++;
+           :}
+           | LOOP LEFTPAR Expression RIGHTPAR error
+           {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje '{'.");
+              parser.errNo++;
+           :}
+           | LOOP LEFTPAR Expression error
+           {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje ')'");
+              parser.errNo++;
+           :}
+           | LOOP LEFTPAR error
+           {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje Expression");
+              parser.errNo++;
+           :}
+           | LOOP error
+           {:
+              System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje validna petlja.");
+              parser.errNo++;
+           :};
+
+Expression ::= Expression OR AndExpression
+             | AndExpression;
+
+AndExpression ::= AndExpression AND RelExpression
+                | RelExpression;
+
+RelExpression ::= Term LT Term
+                | Term LE Term
+                | Term EQ Term
+                | Term NE Term
+                | Term GT Term
+                | Term GE Term
+                | Term;
+
+RelOp ::= LT
+                | LE
+                | EQ
+                | NE
+                | GT
+                | GE
+                | error
+                {:
+                  System.out.println("Greska u liniji " + parser.getLine() + ": Neispravan relacioni operator.");
+                  parser.errNo++;
+                :};
+
+Term ::= ID
+       | CONST
+       | LEFTPAR Expression RIGHTPAR
+       | LEFTPAR Expression error
+         {:
+            System.out.println("Greska u liniji " + parser.getLine() + ": Nedostaje ')'.");
+            parser.errNo++;
+         :};
